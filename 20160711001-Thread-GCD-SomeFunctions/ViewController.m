@@ -9,6 +9,7 @@
 #import "ViewController.h"
 
 @interface ViewController ()
+@property (weak, nonatomic) IBOutlet UIImageView *imageView;
 
 @end
 
@@ -28,8 +29,57 @@
     // 执行一次
 //    [self once];
     
-    // 快速迭代
-    [self apply];
+    // 使用快速迭代并行拷贝文件
+//    [self apply];
+    
+    // 使用队列组合并图片
+    [self queueGroup];
+}
+
+- (void)queueGroup {
+    // 1.创建两个图片对象
+    __block UIImage *image1;
+    __block UIImage *image2;
+    
+    // 2.创建一个队列组对象
+    dispatch_group_t dispatchGroup = dispatch_group_create();
+    // 获取一个全局的并行队列
+    dispatch_queue_t dispatchQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    // 3.异步队列组函数下载第一张图片
+    dispatch_group_async(dispatchGroup, dispatchQueue, ^{
+        NSURL *imageUrl = [NSURL URLWithString:@"http://pic61.nipic.com/file/20150228/7487939_190907874000_2.jpg"];
+        
+        image1 = [[UIImage alloc] initWithData:[NSData dataWithContentsOfURL:imageUrl]];
+    });
+
+    // 4.异步队列组函数下载第二张图片
+    dispatch_group_async(dispatchGroup, dispatchQueue, ^{
+        NSURL *imageUrl = [NSURL URLWithString:@"http://img.tuku.cn/file_big/201505/d620f7e86cb84799aa62b8c9ef50d938.jpg"];
+        
+        image2 = [[UIImage alloc] initWithData:[NSData dataWithContentsOfURL:imageUrl]];
+    });
+    
+    // 5.队列组完成后掉用此通知
+    dispatch_group_notify(dispatchGroup, dispatchQueue, ^{
+        // 5.1.开启一个图形上下文
+        UIGraphicsBeginImageContext(CGSizeMake(300, 300));
+        
+        // 5.2.将图片分别画入图形上下文中
+        [image1 drawInRect:CGRectMake(0, 0, 150, 300)];
+        [image2 drawInRect:CGRectMake(150, 0, 150, 300)];
+        
+        // 5.3.从图形上下文中生成一张新的图片
+        UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+        
+        // 5.4.关闭图形上下文
+        UIGraphicsEndImageContext();
+        
+        // 5.5.回到主线程中显示新的图片
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.imageView.image = image;
+        });
+    });
 }
 
 /**
